@@ -6,6 +6,7 @@ import android.text.TextUtils;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -18,6 +19,47 @@ import java.util.List;
 public final class AccessibilityHelper {
 
     private AccessibilityHelper() {}
+
+    //获取可领取的红包
+    public static List<AccessibilityNodeInfo> findLuckMoneyNotReceived(AccessibilityNodeInfo nodeInfo) {
+        String resId = "com.tencent.mm:id/r2";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            List<AccessibilityNodeInfo> listNotReceived = new ArrayList<AccessibilityNodeInfo>();
+            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByViewId(resId);
+            for(int i = 0; i < list.size(); i++){
+                List<AccessibilityNodeInfo> listReceived = findNodeInfosListById(list.get(i).getParent(), "com.tencent.mm:id/r0");
+                if(listReceived != null && listReceived.size() == 0){
+                    listNotReceived.add(list.get(i));
+                }
+            }
+            return listNotReceived;
+        }
+        return null;
+    }
+
+    /** 通过id查找*/
+    public static AccessibilityNodeInfo findNodeInfosByIdFilterByText(AccessibilityNodeInfo nodeInfo, String resId, String text) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByViewId(resId);
+            if(list != null && !list.isEmpty()) {
+                for(int i = 0; i < list.size(); i++) {
+                    String str = list.get(i).getText().toString();
+                    if(str.indexOf(text) != -1){
+                        return list.get(i);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 通过id查找*/
+    public static List<AccessibilityNodeInfo> findNodeInfosListById(AccessibilityNodeInfo nodeInfo, String resId) {
+        if (nodeInfo != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            return nodeInfo.findAccessibilityNodeInfosByViewId(resId);
+        }
+        return null;
+    }
 
     /** 通过id查找*/
     public static AccessibilityNodeInfo findNodeInfosById(AccessibilityNodeInfo nodeInfo, String resId) {

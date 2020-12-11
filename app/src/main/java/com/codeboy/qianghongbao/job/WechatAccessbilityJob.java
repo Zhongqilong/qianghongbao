@@ -58,7 +58,7 @@ public class WechatAccessbilityJob extends BaseAccessbilityJob {
 
     private int mCurrentWindow = WINDOW_NONE;
 
-    private boolean isReceivingHongbao;
+    private boolean isReceivingHongbao = false;
     private PackageInfo mWechatPackageInfo = null;
     private Handler mHandler = null;
 
@@ -133,9 +133,7 @@ public class WechatAccessbilityJob extends BaseAccessbilityJob {
             if(mCurrentWindow != WINDOW_LAUNCHER) { //不在聊天界面或聊天列表，不处理
                 return;
             }
-            if(isReceivingHongbao) {
-                handleChatListHongBao();
-            }
+            handleChatListHongBao();
         }
     }
 
@@ -207,7 +205,6 @@ public class WechatAccessbilityJob extends BaseAccessbilityJob {
     /** 打开通知栏消息*/
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     private void newHongBaoNotification(Notification notification) {
-        isReceivingHongbao = true;
         //以下是精华，将微信的通知栏消息打开
         PendingIntent pendingIntent = notification.contentIntent;
         boolean lock = NotifyHelper.isLockScreen(getContext());
@@ -225,15 +222,17 @@ public class WechatAccessbilityJob extends BaseAccessbilityJob {
 
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     private void openHongBao(AccessibilityEvent event) {
-        if("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI".equals(event.getClassName())) {
+        String className = event.getClassName().toString();
+        if("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyNotHookReceiveUI".equals(event.getClassName())) {
             mCurrentWindow = WINDOW_LUCKYMONEY_RECEIVEUI;
             //点中了红包，下一步就是去拆红包
             handleLuckyMoneyReceive();
-        } else if("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI".equals(event.getClassName())) {
+        } else if("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyBeforeDetailUI".equals(event.getClassName())
+                    || "com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyDetailUI".equals(event.getClassName())) {
             mCurrentWindow = WINDOW_LUCKYMONEY_DETAIL;
             //拆完红包后看详细的纪录界面
             if(getConfig().getWechatAfterGetHongBaoEvent() == Config.WX_AFTER_GET_GOHOME) { //返回主界面，以便收到下一次的红包通知
-                AccessibilityHelper.performHome(getService());
+                AccessibilityHelper.performBack(getService());
             }
         } else if("com.tencent.mm.ui.LauncherUI".equals(event.getClassName())) {
             mCurrentWindow = WINDOW_LAUNCHER;
@@ -346,25 +345,22 @@ public class WechatAccessbilityJob extends BaseAccessbilityJob {
             }
         }
 
-        List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText("领取红包");
+        if(nodeInfo == null)
+        {
+            return;
+        }
 
-        if(list != null && list.isEmpty()) {
+        List<AccessibilityNodeInfo> listNotReceived = AccessibilityHelper.findLuckMoneyNotReceived(nodeInfo);
+        if(listNotReceived != null && listNotReceived.isEmpty()) {
             // 从消息列表查找红包
-            AccessibilityNodeInfo node = AccessibilityHelper.findNodeInfosByText(nodeInfo, "[微信红包]");
-            if(node != null) {
-                if(BuildConfig.DEBUG) {
-                    Log.i(TAG, "-->微信红包:" + node);
-                }
-                isReceivingHongbao = true;
-                AccessibilityHelper.performClick(nodeInfo);
+            AccessibilityNodeInfo nodeChat = AccessibilityHelper.findNodeInfosByIdFilterByText(nodeInfo,"com.tencent.mm:id/cyv", "[微信红包]"); //进入聊天界面
+            if(nodeChat != null) {
+                AccessibilityHelper.performClick(nodeChat); //进入聊天
             }
-        } else if(list != null) {
-            if (isReceivingHongbao){
-                //最新的红包领起
-                AccessibilityNodeInfo node = list.get(list.size() - 1);
-                AccessibilityHelper.performClick(node);
-                isReceivingHongbao = false;
-            }
+        } else if(listNotReceived != null && listNotReceived.size() > 0) {
+            //最新的红包领起
+            AccessibilityNodeInfo node = listNotReceived.get(listNotReceived.size() - 1);
+            AccessibilityHelper.performClick(node);
         }
     }
 
